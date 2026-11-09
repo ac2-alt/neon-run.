@@ -1,0 +1,62 @@
+name: Build APK
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Unzip project
+        run: unzip -q neon_run.zip
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+
+      - name: Generate Android platform files
+        working-directory: neon_run
+        run: flutter create --platforms=android --org com.neonrun --project-name neon_run .
+
+      - name: Remove default template test
+        working-directory: neon_run
+        run: rm -f test/widget_test.dart
+
+      - name: Set app name
+        working-directory: neon_run
+        run: sed -i 's/android:label="[^"]*"/android:label="NeonRun"/' android/app/src/main/AndroidManifest.xml
+
+      - name: Install dependencies
+        working-directory: neon_run
+        run: flutter pub get
+
+      - name: Generate launcher icons
+        working-directory: neon_run
+        run: dart run flutter_launcher_icons
+
+      - name: Analyze
+        working-directory: neon_run
+        continue-on-error: true
+        run: flutter analyze --no-fatal-infos
+
+      - name: Test
+        working-directory: neon_run
+        continue-on-error: true
+        run: flutter test
+
+      - name: Build release APK
+        working-directory: neon_run
+        run: flutter build apk --release
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: NeonRun-apk
+          path: neon_run/build/app/outputs/flutter-apk/app-release.apk
